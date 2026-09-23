@@ -1,0 +1,15 @@
+# Virtual Environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Game save
+highscore.json
+
+# VS Code
+.vscode/
+
+# Environment
+.env
