@@ -1,187 +1,800 @@
 """
 hand_tracker.py
 
-Handles webcam feed and MediaPipe Tasks Vision hand processing with high-performance tracking.
+Handles:
+- Webcam capture
+- MediaPipe Hand Landmarker
+- Index finger tracking
+- Finger smoothing
+- Finger velocity
+- Finger trail
+- Camera recovery
 """
+
 import os
 import time
+import math
 import urllib.request
+
 import cv2
 import mediapipe as mp
 import pygame
+
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-# The required model for the Hand Landmarker Task Vision API
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hand_landmarker.task')
-MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+
+# ============================================================
+# MEDIAPIPE MODEL
+# ============================================================
+
+MODEL_PATH = os.path.join(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    ),
+    "hand_landmarker.task"
+)
+
+MODEL_URL = (
+    "https://storage.googleapis.com/"
+    "mediapipe-models/hand_landmarker/"
+    "hand_landmarker/float16/1/"
+    "hand_landmarker.task"
+)
+
 
 def download_model_if_missing():
-    """Downloads the MediaPipe hand landmarker model if it doesn't exist."""
-    if not os.path.exists(MODEL_PATH):
-        print("Downloading hand_landmarker.task model...")
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    """
+    Download the MediaPipe model if it does not exist.
+    """
+
+    if os.path.exists(MODEL_PATH):
+        return
+
+    print("Downloading hand_landmarker.task model...")
+
+    try:
+
+        urllib.request.urlretrieve(
+            MODEL_URL,
+            MODEL_PATH
+        )
+
         print("Download complete.")
 
+    except Exception as error:
+
+        print(
+            "Could not download MediaPipe model:"
+        )
+
+        print(error)
+
+        raise
+
+
+# ============================================================
+# HAND TRACKER
+# ============================================================
+
 class HandTracker:
+
     def __init__(self, width, height):
+
         self.width = width
         self.height = height
-        
-        # Ensure the model exists before initializing the detector
-        download_model_if_missing()
-        
-        # Initialize OpenCV video capture
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        
-        # Container for asynchronous results
+
+        # ----------------------------------------------------
+        # Camera
+        # ----------------------------------------------------
+
+        self.cap = None
+
+        self.camera_failures = 0
+        self.max_camera_failures = 10
+
+        self._open_camera()
+
+        # ----------------------------------------------------
+        # MediaPipe result
+        # ----------------------------------------------------
+
         self.latest_result = None
-        
-        # Callback for LIVE_STREAM mode
-        def result_callback(result, output_image, timestamp_ms):
-            self.latest_result = result
-            
-        # Initialize MediaPipe Tasks Vision Hand Landmarker for LIVE_STREAM
-        base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
-        options = vision.HandLandmarkerOptions(
-            base_options=base_options,
-            running_mode=vision.RunningMode.LIVE_STREAM,
-            num_hands=1,
-            min_hand_detection_confidence=0.4,  # Lowered for faster initial detection
-            min_hand_presence_confidence=0.4,   # Lowered to prioritize continuous tracking
-            min_tracking_confidence=0.5,
-            result_callback=result_callback
-        )
-        self.detector = vision.HandLandmarker.create_from_options(options)
-        
-        # State variables for finger tracking
+
+        self.latest_result_time = 0
+
+        # ----------------------------------------------------
+        # Finger position
+        # ----------------------------------------------------
+
         self.prev_finger_pos = None
         self.current_finger_pos = None
+
         self.last_raw_pos = None
+
+        # Smoothed velocity
         self.velocity = (0.0, 0.0)
-        
-        # Finger trail for rendering
+
+        # ----------------------------------------------------
+        # Smoothing configuration
+        # ----------------------------------------------------
+
+        self.MIN_ALPHA = 0.30
+        self.MAX_ALPHA = 0.95
+
+        # Speed at which smoothing becomes more responsive
+        self.SPEED_FOR_MAX_ALPHA = 45.0
+
+        # Prevent extremely large tracking jumps
+        self.MAX_POSITION_JUMP = 180.0
+
+        # ----------------------------------------------------
+        # Finger trail
+        # ----------------------------------------------------
+
         self.trail = []
-        self.max_trail_length = 15  # Reverted
-        
-        # Strictly increasing timestamp to prevent MediaPipe async crashes
+
+        self.max_trail_length = 18
+
+        # ----------------------------------------------------
+        # Async timestamp
+        # ----------------------------------------------------
+
         self.frame_timestamp_ms = 0
-        
-    def get_frame_and_finger(self):
-        """
-        Reads frame from webcam, processes MediaPipe hands asynchronously,
-        updates trail, and returns the frame surface and current/prev finger positions.
-        """
-        success, frame = self.cap.read()
-        if not success:
-            # Graceful recovery: try to re-initialize camera if it drops
-            self.cap.release()
-            self.cap = cv2.VideoCapture(0)
-            return None, self.current_finger_pos, self.prev_finger_pos
-            
-        # Mirror the frame
-        frame = cv2.flip(frame, 1)
-        
-        # Convert to RGB
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # Optimization: Resize frame before passing to MediaPipe to reduce CPU load
-        # MediaPipe scales it internally anyway, doing it here saves inference time
-        small_frame = cv2.resize(rgb_frame, (320, 240))
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=small_frame)
-        
-        # Send to async detector with strictly monotonic timestamp
-        self.frame_timestamp_ms += 1
+
+        # ----------------------------------------------------
+        # Camera frame processing
+        # ----------------------------------------------------
+
+        self.processing_width = 320
+        self.processing_height = 240
+
+        # ----------------------------------------------------
+        # Result timeout
+        # ----------------------------------------------------
+
+        self.result_timeout = 0.35
+
+        # ----------------------------------------------------
+        # Initialize detector
+        # ----------------------------------------------------
+
+        download_model_if_missing()
+
+        self._create_detector()
+
+    # ========================================================
+    # CAMERA
+    # ========================================================
+
+    def _open_camera(self):
+
+        # Release old camera if necessary
+        if self.cap is not None:
+
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+
+        self.cap = cv2.VideoCapture(0)
+
+        # Camera resolution
+        self.cap.set(
+            cv2.CAP_PROP_FRAME_WIDTH,
+            self.width
+        )
+
+        self.cap.set(
+            cv2.CAP_PROP_FRAME_HEIGHT,
+            self.height
+        )
+
+        # Try to reduce camera buffering
         try:
-            self.detector.detect_async(mp_image, self.frame_timestamp_ms)
-        except Exception as e:
-            # Handle potential collisions gracefully without breaking the thread
+
+            self.cap.set(
+                cv2.CAP_PROP_BUFFERSIZE,
+                1
+            )
+
+        except Exception:
             pass
-        
-        # Process the latest available result
-        self.prev_finger_pos = self.current_finger_pos
-        
-        if self.latest_result and self.latest_result.hand_landmarks:
-            # Landmark 8 is the index finger tip
-            index_tip = self.latest_result.hand_landmarks[0][8]
-            raw_x = index_tip.x * self.width
-            raw_y = index_tip.y * self.height
-            
-            # Apply adaptive predictive smoothing for low latency and zero jitter
-            if self.current_finger_pos is None or self.last_raw_pos is None:
-                self.current_finger_pos = (raw_x, raw_y)
-                self.last_raw_pos = (raw_x, raw_y)
-                self.velocity = (0.0, 0.0)
+
+        # Reset failure counter
+        self.camera_failures = 0
+
+    # ========================================================
+    # MEDIAPIPE DETECTOR
+    # ========================================================
+
+    def _create_detector(self):
+
+        # Base model configuration
+        base_options = python.BaseOptions(
+            model_asset_path=MODEL_PATH
+        )
+
+        options = vision.HandLandmarkerOptions(
+
+            base_options=base_options,
+
+            # One hand is enough for this game
+            num_hands=1,
+
+            # Async processing
+            running_mode=(
+                vision.RunningMode.LIVE_STREAM
+            ),
+
+            # Detection confidence
+            min_hand_detection_confidence=0.5,
+
+            # Hand presence confidence
+            min_hand_presence_confidence=0.5,
+
+            # Tracking confidence
+            min_tracking_confidence=0.55,
+
+            # Callback
+            result_callback=self._result_callback
+        )
+
+        self.detector = (
+            vision.HandLandmarker
+            .create_from_options(options)
+        )
+
+    # ========================================================
+    # MEDIAPIPE CALLBACK
+    # ========================================================
+
+    def _result_callback(
+        self,
+        result,
+        output_image,
+        timestamp_ms
+    ):
+        """
+        Called by MediaPipe when a new result
+        becomes available.
+        """
+
+        self.latest_result = result
+
+        self.latest_result_time = (
+            time.monotonic()
+        )
+
+    # ========================================================
+    # RESET TRACKING
+    # ========================================================
+
+    def _reset_tracking(self):
+
+        self.prev_finger_pos = None
+        self.current_finger_pos = None
+
+        self.last_raw_pos = None
+
+        self.velocity = (0.0, 0.0)
+
+        self.trail.clear()
+
+    # ========================================================
+    # GET FRAME + FINGER
+    # ========================================================
+
+    def get_frame_and_finger(self):
+
+        # ----------------------------------------------------
+        # Read camera
+        # ----------------------------------------------------
+
+        success, frame = self.cap.read()
+
+        if not success:
+
+            self.camera_failures += 1
+
+            # Remove old tracking data
+            self._reset_tracking()
+
+            # Try reopening camera
+            if (
+                self.camera_failures
+                >= self.max_camera_failures
+            ):
+
+                print(
+                    "Camera connection lost. "
+                    "Trying to reconnect..."
+                )
+
+                self._open_camera()
+
+            return (
+                None,
+                self.current_finger_pos,
+                self.prev_finger_pos
+            )
+
+        self.camera_failures = 0
+
+        # ----------------------------------------------------
+        # Mirror camera
+        # ----------------------------------------------------
+
+        frame = cv2.flip(
+            frame,
+            1
+        )
+
+        # ----------------------------------------------------
+        # Convert BGR -> RGB
+        # ----------------------------------------------------
+
+        rgb_frame = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2RGB
+        )
+
+        # ----------------------------------------------------
+        # Resize for MediaPipe
+        # ----------------------------------------------------
+
+        small_frame = cv2.resize(
+            rgb_frame,
+            (
+                self.processing_width,
+                self.processing_height
+            ),
+            interpolation=cv2.INTER_LINEAR
+        )
+
+        # ----------------------------------------------------
+        # Create MediaPipe image
+        # ----------------------------------------------------
+
+        mp_image = mp.Image(
+            image_format=mp.ImageFormat.SRGB,
+            data=small_frame
+        )
+
+        # ----------------------------------------------------
+        # Timestamp
+        # ----------------------------------------------------
+
+        # Use real monotonic milliseconds.
+        # MediaPipe requires increasing timestamps.
+
+        timestamp = int(
+            time.monotonic() * 1000
+        )
+
+        # Make absolutely sure timestamp increases
+        if timestamp <= self.frame_timestamp_ms:
+
+            timestamp = (
+                self.frame_timestamp_ms + 1
+            )
+
+        self.frame_timestamp_ms = timestamp
+
+        # ----------------------------------------------------
+        # Send frame asynchronously
+        # ----------------------------------------------------
+
+        try:
+
+            self.detector.detect_async(
+                mp_image,
+                self.frame_timestamp_ms
+            )
+
+        except Exception:
+
+            # Don't crash the game if MediaPipe
+            # temporarily rejects a frame.
+            pass
+
+        # ----------------------------------------------------
+        # Previous finger position
+        # ----------------------------------------------------
+
+        self.prev_finger_pos = (
+            self.current_finger_pos
+        )
+
+        # ----------------------------------------------------
+        # Check if result is still fresh
+        # ----------------------------------------------------
+
+        result_is_fresh = (
+            self.latest_result is not None
+            and (
+                time.monotonic()
+                - self.latest_result_time
+            ) <= self.result_timeout
+        )
+
+        # ----------------------------------------------------
+        # Process hand landmarks
+        # ----------------------------------------------------
+
+        if (
+            result_is_fresh
+            and self.latest_result.hand_landmarks
+        ):
+
+            # Landmark 8 = index finger tip
+            index_tip = (
+                self.latest_result
+                .hand_landmarks[0][8]
+            )
+
+            # ------------------------------------------------
+            # Convert normalized coordinates
+            # to game coordinates
+            # ------------------------------------------------
+
+            raw_x = (
+                index_tip.x
+                * self.width
+            )
+
+            raw_y = (
+                index_tip.y
+                * self.height
+            )
+
+            raw_position = (
+                raw_x,
+                raw_y
+            )
+
+            # ------------------------------------------------
+            # First detection
+            # ------------------------------------------------
+
+            if (
+                self.current_finger_pos is None
+                or self.last_raw_pos is None
+            ):
+
+                self.current_finger_pos = (
+                    raw_position
+                )
+
+                self.last_raw_pos = (
+                    raw_position
+                )
+
+                self.velocity = (
+                    0.0,
+                    0.0
+                )
+
             else:
-                # Raw velocity
-                vx = raw_x - self.last_raw_pos[0]
-                vy = raw_y - self.last_raw_pos[1]
-                
-                # Exponentially smooth velocity to avoid erratic predictions
-                self.velocity = (self.velocity[0] * 0.5 + vx * 0.5, self.velocity[1] * 0.5 + vy * 0.5)
-                
-                import math
-                speed = math.hypot(self.velocity[0], self.velocity[1])
-                
-                # Adaptive alpha for low latency and smooth stationary behavior
-                speed_factor = max(0.0, min(1.0, speed / 40.0)) # Scaled up 20% faster
-                # Base alpha 0.25 (smooths out jitter), max alpha 1.0 (literally zero latency)
-                alpha = 0.25 + speed_factor * 0.75
-                
-                # No prediction, direct follow
-                sm_x = self.current_finger_pos[0] + alpha * (raw_x - self.current_finger_pos[0])
-                sm_y = self.current_finger_pos[1] + alpha * (raw_y - self.current_finger_pos[1])
-                self.current_finger_pos = (sm_x, sm_y)
-                self.last_raw_pos = (raw_x, raw_y)
+
+                # --------------------------------------------
+                # Calculate raw movement
+                # --------------------------------------------
+
+                raw_vx = (
+                    raw_x
+                    - self.last_raw_pos[0]
+                )
+
+                raw_vy = (
+                    raw_y
+                    - self.last_raw_pos[1]
+                )
+
+                raw_speed = math.hypot(
+                    raw_vx,
+                    raw_vy
+                )
+
+                # --------------------------------------------
+                # Ignore impossible jumps
+                # --------------------------------------------
+
+                if (
+                    raw_speed
+                    > self.MAX_POSITION_JUMP
+                ):
+
+                    # Treat this as a tracking glitch
+                    self.last_raw_pos = (
+                        raw_position
+                    )
+
+                    return (
+                        self._create_surface(
+                            rgb_frame
+                        ),
+                        self.current_finger_pos,
+                        self.prev_finger_pos
+                    )
+
+                # --------------------------------------------
+                # Smooth velocity
+                # --------------------------------------------
+
+                velocity_smoothing = 0.65
+
+                self.velocity = (
+
+                    self.velocity[0]
+                    * velocity_smoothing
+                    + raw_vx
+                    * (1 - velocity_smoothing),
+
+                    self.velocity[1]
+                    * velocity_smoothing
+                    + raw_vy
+                    * (1 - velocity_smoothing)
+                )
+
+                # --------------------------------------------
+                # Calculate speed
+                # --------------------------------------------
+
+                speed = math.hypot(
+                    self.velocity[0],
+                    self.velocity[1]
+                )
+
+                # --------------------------------------------
+                # Adaptive smoothing
+                # --------------------------------------------
+
+                speed_factor = min(
+                    1.0,
+                    speed
+                    / self.SPEED_FOR_MAX_ALPHA
+                )
+
+                alpha = (
+                    self.MIN_ALPHA
+                    + (
+                        self.MAX_ALPHA
+                        - self.MIN_ALPHA
+                    )
+                    * speed_factor
+                )
+
+                # --------------------------------------------
+                # Smooth finger position
+                # --------------------------------------------
+
+                current_x = (
+                    self.current_finger_pos[0]
+                )
+
+                current_y = (
+                    self.current_finger_pos[1]
+                )
+
+                smoothed_x = (
+                    current_x
+                    + alpha
+                    * (raw_x - current_x)
+                )
+
+                smoothed_y = (
+                    current_y
+                    + alpha
+                    * (raw_y - current_y)
+                )
+
+                self.current_finger_pos = (
+                    smoothed_x,
+                    smoothed_y
+                )
+
+                self.last_raw_pos = (
+                    raw_position
+                )
+
         else:
+
+            # ------------------------------------------------
+            # No valid hand
+            # ------------------------------------------------
+
             self.current_finger_pos = None
+
             self.last_raw_pos = None
-                
+
+            self.velocity = (
+                0.0,
+                0.0
+            )
+
+        # ----------------------------------------------------
         # Update trail
-        if self.current_finger_pos:
-            self.trail.append(self.current_finger_pos)
-            if len(self.trail) > self.max_trail_length:
+        # ----------------------------------------------------
+
+        self._update_trail()
+
+        # ----------------------------------------------------
+        # Convert camera frame to Pygame
+        # ----------------------------------------------------
+
+        frame_surface = self._create_surface(
+            rgb_frame
+        )
+
+        return (
+            frame_surface,
+            self.current_finger_pos,
+            self.prev_finger_pos
+        )
+
+    # ========================================================
+    # UPDATE TRAIL
+    # ========================================================
+
+    def _update_trail(self):
+
+        if self.current_finger_pos is not None:
+
+            self.trail.append(
+                self.current_finger_pos
+            )
+
+            # Limit trail length
+            if (
+                len(self.trail)
+                > self.max_trail_length
+            ):
+
                 self.trail.pop(0)
+
         else:
-            if len(self.trail) > 0:
+
+            # Fade trail when hand disappears
+            if self.trail:
+
                 self.trail.pop(0)
-                
-        # Convert frame to Pygame surface
-        # Pygame surface requires the frame to be rotated and transposed
-        frame_surface = pygame.surfarray.make_surface(rgb_frame.swapaxes(0, 1))
-        
-        return frame_surface, self.current_finger_pos, self.prev_finger_pos
+
+    # ========================================================
+    # CREATE PYGAME SURFACE
+    # ========================================================
+
+    def _create_surface(self, rgb_frame):
+
+        return pygame.surfarray.make_surface(
+            rgb_frame.swapaxes(0, 1)
+        )
+
+    # ========================================================
+    # DRAW FINGER TRAIL
+    # ========================================================
 
     def draw_trail(self, surface):
-        """
-        Draws the smooth glowing trail following the finger.
-        """
-        if len(self.trail) > 1:
-            for i in range(1, len(self.trail)):
-                # Dynamic thickness and alpha interpolation
-                ratio = i / len(self.trail)
-                core_thickness = int(ratio * 12)
-                glow_thickness = core_thickness + 8
-                
-                p1 = (int(self.trail[i-1][0]), int(self.trail[i-1][1]))
-                p2 = (int(self.trail[i][0]), int(self.trail[i][1]))
-                
-                # Draw outer glow
-                pygame.draw.line(surface, (0, 150, 255), p1, p2, glow_thickness)
-                # Draw inner core
-                pygame.draw.line(surface, (200, 255, 255), p1, p2, core_thickness)
-                
-            # Draw the glowing tip
-            p_last = (int(self.trail[-1][0]), int(self.trail[-1][1]))
-            pygame.draw.circle(surface, (0, 150, 255), p_last, 16, 2)
-            pygame.draw.circle(surface, (255, 255, 255), p_last, 10)
+
+        if len(self.trail) < 2:
+            return
+
+        trail_length = len(
+            self.trail
+        )
+
+        for index in range(
+            1,
+            trail_length
+        ):
+
+            ratio = (
+                index
+                / trail_length
+            )
+
+            # Older part of trail is thinner
+            core_thickness = max(
+                2,
+                int(
+                    ratio * 10
+                )
+            )
+
+            glow_thickness = (
+                core_thickness + 8
+            )
+
+            p1 = (
+                int(
+                    self.trail[index - 1][0]
+                ),
+                int(
+                    self.trail[index - 1][1]
+                )
+            )
+
+            p2 = (
+                int(
+                    self.trail[index][0]
+                ),
+                int(
+                    self.trail[index][1]
+                )
+            )
+
+            # ------------------------------------------------
+            # Outer glow
+            # ------------------------------------------------
+
+            pygame.draw.line(
+                surface,
+                (0, 150, 255),
+                p1,
+                p2,
+                glow_thickness
+            )
+
+            # ------------------------------------------------
+            # Inner trail
+            # ------------------------------------------------
+
+            pygame.draw.line(
+                surface,
+                (200, 255, 255),
+                p1,
+                p2,
+                core_thickness
+            )
+
+        # ----------------------------------------------------
+        # Glowing finger tip
+        # ----------------------------------------------------
+
+        last_point = self.trail[-1]
+
+        p_last = (
+            int(last_point[0]),
+            int(last_point[1])
+        )
+
+        pygame.draw.circle(
+            surface,
+            (0, 150, 255),
+            p_last,
+            16,
+            2
+        )
+
+        pygame.draw.circle(
+            surface,
+            (255, 255, 255),
+            p_last,
+            7
+        )
+
+    # ========================================================
+    # RELEASE
+    # ========================================================
 
     def release(self):
-        """Release the camera resources and close detector."""
-        self.cap.release()
+
+        # Camera
+        if self.cap is not None:
+
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+
+        # MediaPipe detector
         try:
-            self.detector.close()
-        except:
+
+            if self.detector is not None:
+
+                self.detector.close()
+
+        except Exception:
             pass
+
+        self._reset_tracking()
