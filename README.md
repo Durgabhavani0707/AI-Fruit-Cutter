@@ -1,71 +1,157 @@
-# Fruit Cutter AI
+🍎 **AI Fruit Cutter**__
 
-Fruit Cutter AI is an interactive, gesture-controlled game built with Python, OpenCV, MediaPipe, and Pygame. It uses your webcam to track your hand, allowing you to slice virtual fruits using your index finger—just like Fruit Ninja, but in real life!
+An AI-powered fruit slicing game that uses real-time hand tracking to let players slice fruits with their finger movements through a webcam.
 
-## Features
+✨ **Features**
+🤖 AI Hand Tracking using MediaPipe
+✋ Real-time index-finger detection
+🍎 Multiple fruit types
+💣 Bomb obstacles
+❤️ Three-life game system
+🔥 Combo and score system
+🏆 High-score saving
+💥 Particle effects and screen shake
+🎯 Smooth fruit physics and collision detection
+🎨 Modern game interface
+📷 Webcam-based interaction
+🖱️ Mouse fallback for gameplay/menu interaction  
 
-- **Webcam Integration**: Real-time video feed displayed as the background.
-- **Hand Tracking**: Uses MediaPipe to track the index finger tip to act as a virtual blade.
-- **Fruit Physics**: Realistic gravity and velocity for fruits spawning from the bottom.
-- **Collision Detection**: Slices fruits dynamically when your finger trail crosses them.
-- **Difficulty Scaling**: Game progressively speeds up and spawns more fruits as your score increases.
-- **Combo System**: Slice multiple fruits quickly to earn combo multipliers.
-- **Bombs**: Avoid slicing the black bombs, or it's game over!
-- **Local High Scores**: Your highest score is automatically saved and loaded.
-- **Modular Architecture**: Easy to extend for new game modes (e.g., Time Attack, Endless).
+🛠️ **Technologies Used**
+Technology	Purpose
+Python	Core programming
+Pygame	Game development and UI
+OpenCV	Webcam input
+MediaPipe	AI hand tracking
+NumPy	Numerical processing
+JSON	High-score storage
 
-## Prerequisites
+📂 **Project Structure**
+AI-Fruit-Cutter-main/
+│
+├── collision.py
+├── fruit.py
+├── game.py
+├── hand_landmarker.task
+├── hand_tracker.py
+├── highscore.json
+├── main.py
+├── README.md
+├── requirements.txt
+├── settings.py
+└── ui.py
 
-- Python 3.11+
-- A working webcam
-
-## Installation
-
-1. Clone or download this repository.
-2. Navigate to the project directory:
-   ```bash
-   cd fruit-cutter-ai
-   ```
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-Run the game using the following command:
-```bash
+⚙️ **Installation**
+1. Clone the repository
+git clone https://github.com/Durgabhavani0707/AI-Fruit-Cutter.git
+2. Open the project
+cd AI-Fruit-Cutter
+3. Install dependencies
+pip install -r requirements.txt
+4. Run the game
 python main.py
-```
+🎮 How to Play
+Start the game.
+Allow webcam access.
+Move your index finger in front of the camera.
+Move across fruits to slice them.
+Avoid bombs.
+Build combos to increase your score.
+Try to beat your high score!
 
-### How to Play
+🖱️ Mouse Support
 
-1. Stand in front of your webcam.
-2. Wave your hand to start the game from the Main Menu.
-3. Move your index finger to draw a slicing trail on the screen.
-4. Slice fruits to score points.
-5. Slice multiple fruits quickly for a combo multiplier.
-6. Do not slice the black Bombs!
-7. Do not let 3 fruits fall unsliced, or you lose all your lives.
+If hand tracking is unavailable, mouse controls can be used as a fallback.
 
-## Project Structure
+🤖 AI Hand Tracking
 
-```
-fruit-cutter-ai/
-│── main.py            # Entry point and Pygame loop
-│── game.py            # Game state, scoring, difficulty, and physics update
-│── ui.py              # HUD and menus rendering
-│── fruit.py           # Fruit & Bomb classes with particle effects
-│── collision.py       # Math helpers for slicing detection
-│── hand_tracker.py    # MediaPipe hand tracking and trail rendering
-│── settings.py        # Global configuration and constants
-│── requirements.txt   # Dependencies
-│── README.md          # Documentation
-│── assets/            # Directory for images, sounds, and fonts (optional)
-```
+The project uses MediaPipe Hand Landmarker to detect hand landmarks from the webcam.
 
-## Future Enhancements
-- Asset Loading: Add PNG sprites for fruits and custom background images.
-- Audio: Integrate slicing and explosion sound effects.
-- Power-ups: Add Slow-mo, Freeze, or Golden Fruits.
-- Additional Game Modes: Implement Time Attack and Endless modes.
+The system tracks the index fingertip landmark and converts its movement into the slicing path used by the game.
+
+Webcam
+   ↓
+OpenCV
+   ↓
+MediaPipe Hand Tracking
+   ↓
+Index Finger Detection
+   ↓
+Slicing Path
+   ↓
+Collision Detection
+   ↓
+Fruit Sliced
+
+🍉 Game Elements
+Fruits
+🍎 Apple
+🍌 Banana
+🍊 Orange
+🍉 Watermelon
+
+Different fruits provide different scores.
+
+💣 Bombs
+
+Bombs act as obstacles. Slicing a bomb can end the game.
+
+🔥 Combo System
+
+Successfully slicing fruits within a short time window increases the combo and rewards continuous gameplay.
+
+🏆 High Score
+
+The highest score is stored locally in:
+
+highscore.json
+🎯 Main Components
+main.py
+
+Controls the overall game flow and game states.
+
+game.py
+
+Handles gameplay, scoring, lives, spawning, collisions and game logic.
+
+fruit.py
+
+Contains fruit, bomb, particle and floating-text objects.
+
+hand_tracker.py
+
+Handles webcam input and AI-based hand tracking.
+
+collision.py
+
+Provides collision detection between the finger movement and game objects.
+
+ui.py
+
+Handles the game's menus, HUD, score display and game-over interface.
+
+settings.py
+
+Stores game configuration, dimensions, colors, difficulty and gameplay settings.
+
+🚀 **Future Improvements**
+🎵 Background music and sound effects
+👥 Multiplayer mode
+📈 Detailed player statistics
+🧠 Improved hand gesture recognition
+🏅 Global leaderboard
+📱 More interaction modes
+🎨 Additional visual effects
+⚡ Further optimization for low-end systems
+
+👩‍💻 Author
+
+Durga Bhavani
+
+B.Tech – Computer Science & Engineering
+
+**GitHub**:
+https://github.com/Durgabhavani0707
+
+📜 **License**
+
+This project is developed for educational and project purposes.
