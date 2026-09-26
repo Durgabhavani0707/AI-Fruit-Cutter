@@ -1,18 +1,18 @@
 """
-ui.py
-
-Modern UI for the AI Fruit Cutter game.
+Premium Luxury UI for the AI Fruit Cutter game.
 
 Includes:
-- Premium HUD
+- Premium glassmorphism HUD
 - Score / High Score
 - Lives
 - Combo animation
 - FPS
-- Main menu
+- Cinematic main menu
 - Game Over screen
 - Animated restart button
 - Smooth progress ring
+- Premium dark theme
+- AI / Computer Vision branding
 """
 
 import math
@@ -27,9 +27,35 @@ from settings import (
 )
 
 
+# ============================================================
+# PREMIUM COLOR SYSTEM
+# ============================================================
+
+MIDNIGHT = (5, 8, 18)
+GLASS = (12, 18, 34)
+GLASS_LIGHT = (20, 29, 50)
+
+CYAN = (72, 224, 255)
+CYAN_SOFT = (115, 245, 255)
+
+VIOLET = (150, 105, 255)
+
+GOLD = (255, 215, 90)
+
+MINT = (90, 255, 190)
+
+TEXT = (242, 247, 255)
+MUTED = (145, 160, 185)
+
+
 class UI:
 
+    # ========================================================
+    # INITIALIZATION
+    # ========================================================
+
     def __init__(self):
+
         pygame.font.init()
 
         # ----------------------------------------------------
@@ -37,30 +63,44 @@ class UI:
         # ----------------------------------------------------
 
         self.font_title = pygame.font.SysFont(
-            "Arial", 72, bold=True
+            "Segoe UI",
+            72,
+            bold=True
         )
 
         self.font_huge = pygame.font.SysFont(
-            "Arial", 64, bold=True
+            "Segoe UI",
+            64,
+            bold=True
         )
 
         self.font_large = pygame.font.SysFont(
-            "Arial", 48, bold=True
+            "Segoe UI",
+            48,
+            bold=True
         )
 
         self.font_medium = pygame.font.SysFont(
-            "Arial", 30, bold=True
+            "Segoe UI",
+            30,
+            bold=True
         )
 
         self.font_small = pygame.font.SysFont(
-            "Arial", 22, bold=True
+            "Segoe UI",
+            22,
+            bold=True
         )
 
         self.font_tiny = pygame.font.SysFont(
-            "Arial", 17
+            "Segoe UI",
+            17
         )
 
+        # ----------------------------------------------------
         # Animation state
+        # ----------------------------------------------------
+
         self.hover_anim = 0.0
         self.last_time = pygame.time.get_ticks()
 
@@ -68,7 +108,227 @@ class UI:
         self.combo_alpha = 255
 
     # ========================================================
-    # Utility
+    # PREMIUM VISUAL HELPERS
+    # ========================================================
+
+    def _draw_shadow_text(
+        self,
+        surface,
+        text,
+        font,
+        color,
+        center,
+        shadow=(0, 0, 0, 150),
+        offset=3
+    ):
+
+        shadow_surf = pygame.Surface(
+            (WIDTH, HEIGHT),
+            pygame.SRCALPHA
+        )
+
+        shadow_text = font.render(
+            text,
+            True,
+            shadow[:3]
+        )
+
+        shadow_text.set_alpha(
+            shadow[3]
+        )
+
+        shadow_surf.blit(
+            shadow_text,
+            (
+                center[0]
+                - shadow_text.get_width() // 2
+                + offset,
+
+                center[1]
+                - shadow_text.get_height() // 2
+                + offset
+            )
+        )
+
+        surface.blit(
+            shadow_surf,
+            (0, 0)
+        )
+
+        rendered = font.render(
+            text,
+            True,
+            color
+        )
+
+        surface.blit(
+            rendered,
+            (
+                center[0]
+                - rendered.get_width() // 2,
+
+                center[1]
+                - rendered.get_height() // 2
+            )
+        )
+
+    # ========================================================
+    # GLASS PANEL
+    # ========================================================
+
+    def _draw_glass_panel(
+        self,
+        surface,
+        rect,
+        fill=(12, 18, 34, 220),
+        border=(72, 224, 255, 90),
+        radius=24
+    ):
+
+        panel = pygame.Surface(
+            rect.size,
+            pygame.SRCALPHA
+        )
+
+        pygame.draw.rect(
+            panel,
+            fill,
+            panel.get_rect(),
+            border_radius=radius
+        )
+
+        pygame.draw.rect(
+            panel,
+            border,
+            panel.get_rect(),
+            1,
+            border_radius=radius
+        )
+
+        surface.blit(
+            panel,
+            rect.topleft
+        )
+
+        # Small glass highlight
+        highlight = pygame.Surface(
+            (
+                max(1, rect.width - 32),
+                2
+            ),
+            pygame.SRCALPHA
+        )
+
+        highlight.fill(
+            (255, 255, 255, 28)
+        )
+
+        surface.blit(
+            highlight,
+            (
+                rect.x + 16,
+                rect.y + 8
+            )
+        )
+
+    # ========================================================
+    # CINEMATIC BACKGROUND
+    # ========================================================
+
+    def _draw_menu_background(self, surface):
+
+        # Gradient background
+
+        for y in range(HEIGHT):
+
+            t = y / max(
+                1,
+                HEIGHT - 1
+            )
+
+            r = int(
+                4 + 8 * t
+            )
+
+            g = int(
+                7 + 10 * t
+            )
+
+            b = int(
+                20 + 24 * t
+            )
+
+            pygame.draw.line(
+                surface,
+                (r, g, b),
+                (0, y),
+                (WIDTH, y)
+            )
+
+        # ----------------------------------------------------
+        # Technical grid
+        # ----------------------------------------------------
+
+        for x in range(
+            0,
+            WIDTH,
+            80
+        ):
+
+            pygame.draw.line(
+                surface,
+                (30, 48, 75),
+                (x, 0),
+                (x, HEIGHT),
+                1
+            )
+
+        for y in range(
+            0,
+            HEIGHT,
+            80
+        ):
+
+            pygame.draw.line(
+                surface,
+                (30, 48, 75),
+                (0, y),
+                (WIDTH, y),
+                1
+            )
+
+        # ----------------------------------------------------
+        # Center glow
+        # ----------------------------------------------------
+
+        glow = pygame.Surface(
+            (WIDTH, HEIGHT),
+            pygame.SRCALPHA
+        )
+
+        cx = WIDTH // 2
+        cy = HEIGHT // 2 - 80
+
+        for radius, alpha in (
+            (300, 8),
+            (230, 10),
+            (170, 14)
+        ):
+
+            pygame.draw.circle(
+                glow,
+                (60, 170, 255, alpha),
+                (cx, cy),
+                radius
+            )
+
+        surface.blit(
+            glow,
+            (0, 0)
+        )
+
+    # ========================================================
+    # CENTER TEXT
     # ========================================================
 
     def draw_text_center(
@@ -77,13 +337,24 @@ class UI:
         text,
         font,
         color,
-        y,
+        y
     ):
-        rendered = font.render(text, True, color)
 
-        x = WIDTH // 2 - rendered.get_width() // 2
+        rendered = font.render(
+            text,
+            True,
+            color
+        )
 
-        surface.blit(rendered, (x, y))
+        x = (
+            WIDTH // 2
+            - rendered.get_width() // 2
+        )
+
+        surface.blit(
+            rendered,
+            (x, y)
+        )
 
         return rendered
 
@@ -98,32 +369,38 @@ class UI:
         high_score,
         lives,
         combo,
-        fps,
+        fps
     ):
-        """
-        Draw modern in-game HUD.
-        """
 
         # ----------------------------------------------------
-        # Top glass-style panel
+        # Premium top glass panel
         # ----------------------------------------------------
 
-        hud = pygame.Surface(
-            (WIDTH, 76),
-            pygame.SRCALPHA
+        hud_rect = pygame.Rect(
+            12,
+            10,
+            WIDTH - 24,
+            76
         )
 
-        hud.fill((5, 10, 25, 215))
+        self._draw_glass_panel(
+            surface,
+            hud_rect,
+            fill=(8, 14, 28, 225),
+            border=(72, 224, 255, 80),
+            radius=18
+        )
 
-        surface.blit(hud, (0, 0))
-
+        # ----------------------------------------------------
         # Bottom separator
+        # ----------------------------------------------------
+
         pygame.draw.line(
             surface,
-            (80, 160, 255),
-            (0, 75),
-            (WIDTH, 75),
-            2
+            CYAN,
+            (30, 85),
+            (WIDTH - 30, 85),
+            1
         )
 
         # ----------------------------------------------------
@@ -134,22 +411,22 @@ class UI:
             surface,
             "SCORE",
             str(score),
-            30,
-            12,
-            (80, 220, 255)
+            35,
+            18,
+            CYAN
         )
 
         # ----------------------------------------------------
-        # High Score
+        # High score
         # ----------------------------------------------------
 
         self._draw_stat(
             surface,
             "BEST",
             str(high_score),
-            230,
-            12,
-            (255, 215, 80)
+            235,
+            18,
+            GOLD
         )
 
         # ----------------------------------------------------
@@ -159,12 +436,17 @@ class UI:
         fps_text = self.font_tiny.render(
             f"{int(fps)} FPS",
             True,
-            (160, 180, 200)
+            MUTED
         )
 
         surface.blit(
             fps_text,
-            (WIDTH - fps_text.get_width() - 25, 12)
+            (
+                WIDTH
+                - fps_text.get_width()
+                - 30,
+                18
+            )
         )
 
         # ----------------------------------------------------
@@ -174,20 +456,24 @@ class UI:
         lives_label = self.font_tiny.render(
             "LIVES",
             True,
-            (160, 180, 200)
+            MUTED
         )
 
         surface.blit(
             lives_label,
-            (WIDTH - 190, 12)
+            (
+                WIDTH - 190,
+                18
+            )
         )
 
         for i in range(3):
 
             x = WIDTH - 130 + i * 35
-            y = 45
+            y = 51
 
             if i < lives:
+
                 self.draw_heart(
                     surface,
                     x,
@@ -195,13 +481,15 @@ class UI:
                     16,
                     (255, 70, 90)
                 )
+
             else:
+
                 self.draw_heart(
                     surface,
                     x,
                     y,
                     16,
-                    (70, 75, 90)
+                    (60, 65, 80)
                 )
 
         # ----------------------------------------------------
@@ -212,14 +500,18 @@ class UI:
 
             pulse = (
                 math.sin(
-                    pygame.time.get_ticks() / 100.0
+                    pygame.time.get_ticks()
+                    / 100.0
                 ) + 1
             ) * 0.5
 
-            scale = 1.0 + pulse * 0.08
+            scale = (
+                1.0
+                + pulse * 0.08
+            )
 
             combo_font = pygame.font.SysFont(
-                "Arial",
+                "Segoe UI",
                 int(42 * scale),
                 bold=True
             )
@@ -227,7 +519,7 @@ class UI:
             combo_text = combo_font.render(
                 f"{combo}x COMBO!",
                 True,
-                (255, 220, 60)
+                GOLD
             )
 
             combo_x = (
@@ -235,22 +527,54 @@ class UI:
                 - combo_text.get_width() // 2
             )
 
-            surface.blit(
-                combo_text,
-                (combo_x, 92)
+            # Glow
+            glow = pygame.Surface(
+                (
+                    combo_text.get_width() + 30,
+                    combo_text.get_height() + 20
+                ),
+                pygame.SRCALPHA
             )
 
-            # Small glow line
+            pygame.draw.rect(
+                glow,
+                (255, 215, 90, 20),
+                glow.get_rect(),
+                border_radius=15
+            )
+
+            surface.blit(
+                glow,
+                (
+                    combo_x - 15,
+                    94
+                )
+            )
+
+            surface.blit(
+                combo_text,
+                (
+                    combo_x,
+                    98
+                )
+            )
+
             pygame.draw.line(
                 surface,
-                (255, 210, 60),
-                (WIDTH // 2 - 90, 145),
-                (WIDTH // 2 + 90, 145),
+                GOLD,
+                (
+                    WIDTH // 2 - 90,
+                    145
+                ),
+                (
+                    WIDTH // 2 + 90,
+                    145
+                ),
                 2
             )
 
     # ========================================================
-    # HUD Stat
+    # HUD STAT
     # ========================================================
 
     def _draw_stat(
@@ -260,13 +584,13 @@ class UI:
         value,
         x,
         y,
-        color,
+        color
     ):
 
         label_text = self.font_tiny.render(
             label,
             True,
-            (150, 165, 185)
+            MUTED
         )
 
         value_text = self.font_medium.render(
@@ -282,11 +606,14 @@ class UI:
 
         surface.blit(
             value_text,
-            (x, y + 20)
+            (
+                x,
+                y + 20
+            )
         )
 
     # ========================================================
-    # Heart
+    # HEART
     # ========================================================
 
     def draw_heart(
@@ -295,7 +622,7 @@ class UI:
         x,
         y,
         size,
-        color,
+        color
     ):
 
         pygame.draw.circle(
@@ -322,9 +649,18 @@ class UI:
             surface,
             color,
             [
-                (x - size, y - size // 4),
-                (x + size, y - size // 4),
-                (x, y + size),
+                (
+                    x - size,
+                    y - size // 4
+                ),
+                (
+                    x + size,
+                    y - size // 4
+                ),
+                (
+                    x,
+                    y + size
+                )
             ]
         )
 
@@ -336,17 +672,20 @@ class UI:
         self,
         surface,
         score,
-        high_score,
+        high_score
     ):
 
-        # Dark overlay
+        # ----------------------------------------------------
+        # Dark cinematic overlay
+        # ----------------------------------------------------
+
         overlay = pygame.Surface(
             (WIDTH, HEIGHT),
             pygame.SRCALPHA
         )
 
         overlay.fill(
-            (0, 0, 10, 205)
+            (0, 0, 10, 215)
         )
 
         surface.blit(
@@ -355,7 +694,7 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Panel
+        # Glass panel
         # ----------------------------------------------------
 
         panel_width = 600
@@ -371,35 +710,19 @@ class UI:
             - panel_height // 2
         )
 
-        panel = pygame.Surface(
-            (
-                panel_width,
-                panel_height
-            ),
-            pygame.SRCALPHA
+        panel_rect = pygame.Rect(
+            panel_x,
+            panel_y,
+            panel_width,
+            panel_height
         )
 
-        panel.fill(
-            (15, 20, 40, 235)
-        )
-
-        surface.blit(
-            panel,
-            (panel_x, panel_y)
-        )
-
-        # Panel border
-        pygame.draw.rect(
+        self._draw_glass_panel(
             surface,
-            (80, 150, 255),
-            (
-                panel_x,
-                panel_y,
-                panel_width,
-                panel_height
-            ),
-            2,
-            border_radius=25
+            panel_rect,
+            fill=(12, 18, 34, 242),
+            border=(90, 180, 255, 110),
+            radius=25
         )
 
         # ----------------------------------------------------
@@ -409,7 +732,7 @@ class UI:
         title = self.font_title.render(
             "GAME OVER",
             True,
-            (255, 80, 90)
+            (255, 105, 125)
         )
 
         surface.blit(
@@ -422,13 +745,13 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Score
+        # Final Score
         # ----------------------------------------------------
 
         score_label = self.font_small.render(
             "FINAL SCORE",
             True,
-            (150, 165, 190)
+            MUTED
         )
 
         surface.blit(
@@ -443,7 +766,7 @@ class UI:
         score_text = self.font_huge.render(
             str(score),
             True,
-            (80, 220, 255)
+            CYAN
         )
 
         surface.blit(
@@ -456,13 +779,13 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Best
+        # Best Score
         # ----------------------------------------------------
 
         best_text = self.font_medium.render(
             f"BEST SCORE  •  {high_score}",
             True,
-            (255, 215, 80)
+            GOLD
         )
 
         surface.blit(
@@ -475,13 +798,13 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Instruction
+        # Restart instruction
         # ----------------------------------------------------
 
         instruction = self.font_small.render(
             "Use your hand to restart",
             True,
-            (180, 190, 210)
+            MUTED
         )
 
         surface.blit(
@@ -502,33 +825,41 @@ class UI:
         surface,
         rect,
         is_hovering,
-        progress,
+        progress
     ):
 
         current_time = pygame.time.get_ticks()
 
-        dt = current_time - self.last_time
+        dt = (
+            current_time
+            - self.last_time
+        )
 
         self.last_time = current_time
 
-        dt = max(0, min(dt, 50))
+        dt = max(
+            0,
+            min(dt, 50)
+        )
 
         # ----------------------------------------------------
-        # Smooth hover animation
+        # Hover animation
         # ----------------------------------------------------
 
         if is_hovering:
 
             self.hover_anim = min(
                 1.0,
-                self.hover_anim + dt / 180.0
+                self.hover_anim
+                + dt / 180.0
             )
 
         else:
 
             self.hover_anim = max(
                 0.0,
-                self.hover_anim - dt / 220.0
+                self.hover_anim
+                - dt / 220.0
             )
 
         ease = 1.0 - (
@@ -539,16 +870,31 @@ class UI:
         # Scale
         # ----------------------------------------------------
 
-        scale = 1.0 + 0.08 * ease
+        scale = (
+            1.0
+            + 0.08 * ease
+        )
 
         if progress >= 1.0:
             scale += 0.05
 
-        width = int(rect.width * scale)
-        height = int(rect.height * scale)
+        width = int(
+            rect.width * scale
+        )
 
-        x = rect.centerx - width // 2
-        y = rect.centery - height // 2
+        height = int(
+            rect.height * scale
+        )
+
+        x = (
+            rect.centerx
+            - width // 2
+        )
+
+        y = (
+            rect.centery
+            - height // 2
+        )
 
         button_rect = pygame.Rect(
             x,
@@ -595,29 +941,50 @@ class UI:
 
             surface.blit(
                 glow,
-                (x - 30, y - 30)
+                (
+                    x - 30,
+                    y - 30
+                )
             )
 
         # ----------------------------------------------------
         # Button color
         # ----------------------------------------------------
 
-        normal_color = (15, 100, 65)
-        hover_color = (20, 190, 105)
+        normal_color = (
+            15,
+            100,
+            65
+        )
+
+        hover_color = (
+            20,
+            190,
+            105
+        )
 
         r = int(
             normal_color[0]
-            + (hover_color[0] - normal_color[0]) * ease
+            + (
+                hover_color[0]
+                - normal_color[0]
+            ) * ease
         )
 
         g = int(
             normal_color[1]
-            + (hover_color[1] - normal_color[1]) * ease
+            + (
+                hover_color[1]
+                - normal_color[1]
+            ) * ease
         )
 
         b = int(
             normal_color[2]
-            + (hover_color[2] - normal_color[2]) * ease
+            + (
+                hover_color[2]
+                - normal_color[2]
+            ) * ease
         )
 
         pygame.draw.rect(
@@ -627,10 +994,9 @@ class UI:
             border_radius=18
         )
 
-        # Border
         pygame.draw.rect(
             surface,
-            (100, 255, 180),
+            MINT,
             button_rect,
             2,
             border_radius=18
@@ -672,18 +1038,28 @@ class UI:
 
         surface.blit(
             text,
-            (text_x, text_y)
+            (
+                text_x,
+                text_y
+            )
         )
 
     # ========================================================
     # MAIN MENU
     # ========================================================
 
-    def draw_main_menu(self, surface):
+    def draw_main_menu(
+        self,
+        surface
+    ):
 
         # ----------------------------------------------------
-        # Background overlay
+        # Cinematic background
         # ----------------------------------------------------
+
+        self._draw_menu_background(
+            surface
+        )
 
         overlay = pygame.Surface(
             (WIDTH, HEIGHT),
@@ -691,7 +1067,7 @@ class UI:
         )
 
         overlay.fill(
-            (3, 8, 20, 210)
+            (3, 6, 16, 90)
         )
 
         surface.blit(
@@ -700,7 +1076,7 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Decorative circles
+        # Decorative animated rings
         # ----------------------------------------------------
 
         center_x = WIDTH // 2
@@ -708,58 +1084,87 @@ class UI:
 
         pulse = (
             math.sin(
-                pygame.time.get_ticks() / 700
+                pygame.time.get_ticks()
+                / 700
             ) + 1
         ) * 0.5
 
         radius = int(
-            170 + pulse * 15
+            170
+            + pulse * 15
         )
 
         pygame.draw.circle(
             surface,
             (20, 80, 130),
-            (center_x, center_y - 90),
+            (
+                center_x,
+                center_y - 90
+            ),
             radius,
             2
         )
 
         pygame.draw.circle(
             surface,
-            (40, 150, 180),
-            (center_x, center_y - 90),
+            (70, 150, 210),
+            (
+                center_x,
+                center_y - 90
+            ),
             radius - 25,
             1
         )
 
         # ----------------------------------------------------
-        # Title
+        # Main title
         # ----------------------------------------------------
 
-        title = self.font_title.render(
+        self._draw_shadow_text(
+            surface,
             "FRUIT CUTTER",
-            True,
-            WHITE
+            self.font_title,
+            TEXT,
+            (
+                WIDTH // 2,
+                HEIGHT // 3 - 25
+            ),
+            shadow=(
+                0,
+                0,
+                0,
+                180
+            ),
+            offset=4
         )
 
-        title_x = (
-            WIDTH // 2
-            - title.get_width() // 2
+        # ----------------------------------------------------
+        # AI / Computer Vision badge
+        # ----------------------------------------------------
+
+        badge = self.font_small.render(
+            "AI  •  COMPUTER VISION  •  HAND GESTURE CONTROL",
+            True,
+            CYAN_SOFT
         )
 
         surface.blit(
-            title,
+            badge,
             (
-                title_x,
-                HEIGHT // 3 - 60
+                WIDTH // 2
+                - badge.get_width() // 2,
+                HEIGHT // 3 + 52
             )
         )
 
-        # AI text
+        # ----------------------------------------------------
+        # AI label
+        # ----------------------------------------------------
+
         ai_text = self.font_large.render(
             "AI",
             True,
-            (80, 220, 255)
+            VIOLET
         )
 
         surface.blit(
@@ -767,12 +1172,12 @@ class UI:
             (
                 WIDTH // 2
                 - ai_text.get_width() // 2,
-                HEIGHT // 3 + 15
+                HEIGHT // 3 + 82
             )
         )
 
         # ----------------------------------------------------
-        # Instruction panel
+        # Instruction glass panel
         # ----------------------------------------------------
 
         box = pygame.Rect(
@@ -782,19 +1187,12 @@ class UI:
             80
         )
 
-        pygame.draw.rect(
+        self._draw_glass_panel(
             surface,
-            (10, 20, 40),
             box,
-            border_radius=20
-        )
-
-        pygame.draw.rect(
-            surface,
-            (60, 150, 220),
-            box,
-            2,
-            border_radius=20
+            fill=(10, 18, 36, 235),
+            border=(72, 224, 255, 110),
+            radius=20
         )
 
         prompt = self.font_medium.render(
@@ -814,13 +1212,13 @@ class UI:
         )
 
         # ----------------------------------------------------
-        # Bottom text
+        # Footer
         # ----------------------------------------------------
 
         footer = self.font_tiny.render(
-            "Slice fruits • Avoid bombs • Build combos",
+            "Slice fruits  •  Avoid bombs  •  Build combos",
             True,
-            (130, 150, 175)
+            MUTED
         )
 
         surface.blit(
@@ -842,7 +1240,7 @@ class UI:
         rect,
         radius,
         thickness,
-        progress,
+        progress
     ):
 
         if progress <= 0:
@@ -855,39 +1253,57 @@ class UI:
 
         points = []
 
-        # ----------------------------------------------------
-        # Generate rounded rectangle path
-        # ----------------------------------------------------
-
         segments = 12
 
+        # ----------------------------------------------------
         # Top
+        # ----------------------------------------------------
+
         points.append(
-            (rect.left + radius, rect.top)
+            (
+                rect.left + radius,
+                rect.top
+            )
         )
 
         points.append(
-            (rect.right - radius, rect.top)
+            (
+                rect.right - radius,
+                rect.top
+            )
         )
 
+        # ----------------------------------------------------
         # Top-right
-        for i in range(segments + 1):
+        # ----------------------------------------------------
+
+        for i in range(
+            segments + 1
+        ):
 
             angle = math.radians(
-                -90 + 90 * i / segments
+                -90
+                + 90 * i / segments
             )
 
             points.append(
                 (
-                    rect.right - radius
-                    + radius * math.cos(angle),
+                    rect.right
+                    - radius
+                    + radius
+                    * math.cos(angle),
 
-                    rect.top + radius
-                    + radius * math.sin(angle)
+                    rect.top
+                    + radius
+                    + radius
+                    * math.sin(angle)
                 )
             )
 
+        # ----------------------------------------------------
         # Right
+        # ----------------------------------------------------
+
         points.append(
             (
                 rect.right,
@@ -895,24 +1311,36 @@ class UI:
             )
         )
 
+        # ----------------------------------------------------
         # Bottom-right
-        for i in range(segments + 1):
+        # ----------------------------------------------------
+
+        for i in range(
+            segments + 1
+        ):
 
             angle = math.radians(
-                0 + 90 * i / segments
+                90 * i / segments
             )
 
             points.append(
                 (
-                    rect.right - radius
-                    + radius * math.cos(angle),
+                    rect.right
+                    - radius
+                    + radius
+                    * math.cos(angle),
 
-                    rect.bottom - radius
-                    + radius * math.sin(angle)
+                    rect.bottom
+                    - radius
+                    + radius
+                    * math.sin(angle)
                 )
             )
 
+        # ----------------------------------------------------
         # Bottom
+        # ----------------------------------------------------
+
         points.append(
             (
                 rect.left + radius,
@@ -920,24 +1348,37 @@ class UI:
             )
         )
 
+        # ----------------------------------------------------
         # Bottom-left
-        for i in range(segments + 1):
+        # ----------------------------------------------------
+
+        for i in range(
+            segments + 1
+        ):
 
             angle = math.radians(
-                90 + 90 * i / segments
+                90
+                + 90 * i / segments
             )
 
             points.append(
                 (
-                    rect.left + radius
-                    + radius * math.cos(angle),
+                    rect.left
+                    + radius
+                    + radius
+                    * math.cos(angle),
 
-                    rect.bottom - radius
-                    + radius * math.sin(angle)
+                    rect.bottom
+                    - radius
+                    + radius
+                    * math.sin(angle)
                 )
             )
 
+        # ----------------------------------------------------
         # Left
+        # ----------------------------------------------------
+
         points.append(
             (
                 rect.left,
@@ -945,32 +1386,44 @@ class UI:
             )
         )
 
+        # ----------------------------------------------------
         # Top-left
-        for i in range(segments + 1):
+        # ----------------------------------------------------
+
+        for i in range(
+            segments + 1
+        ):
 
             angle = math.radians(
-                180 + 90 * i / segments
+                180
+                + 90 * i / segments
             )
 
             points.append(
                 (
-                    rect.left + radius
-                    + radius * math.cos(angle),
+                    rect.left
+                    + radius
+                    + radius
+                    * math.cos(angle),
 
-                    rect.top + radius
-                    + radius * math.sin(angle)
+                    rect.top
+                    + radius
+                    + radius
+                    * math.sin(angle)
                 )
             )
 
         # ----------------------------------------------------
-        # Calculate total length
+        # Calculate lengths
         # ----------------------------------------------------
 
         lengths = []
 
         total_length = 0
 
-        for i in range(len(points) - 1):
+        for i in range(
+            len(points) - 1
+        ):
 
             p1 = points[i]
             p2 = points[i + 1]
@@ -980,30 +1433,48 @@ class UI:
                 p2[1] - p1[1]
             )
 
-            lengths.append(length)
+            lengths.append(
+                length
+            )
 
             total_length += length
 
-        target = total_length * progress
+        target = (
+            total_length
+            * progress
+        )
 
         # ----------------------------------------------------
         # Build partial path
         # ----------------------------------------------------
 
-        path = [points[0]]
+        path = [
+            points[0]
+        ]
 
         current = 0
 
-        for i, length in enumerate(lengths):
+        for i, length in enumerate(
+            lengths
+        ):
 
-            if current + length <= target:
+            if (
+                current + length
+                <= target
+            ):
 
-                path.append(points[i + 1])
+                path.append(
+                    points[i + 1]
+                )
+
                 current += length
 
             else:
 
-                remaining = target - current
+                remaining = (
+                    target
+                    - current
+                )
 
                 ratio = (
                     remaining / length
@@ -1014,15 +1485,25 @@ class UI:
                 p1 = points[i]
                 p2 = points[i + 1]
 
-                x = p1[0] + (
-                    p2[0] - p1[0]
-                ) * ratio
+                x = (
+                    p1[0]
+                    + (
+                        p2[0]
+                        - p1[0]
+                    ) * ratio
+                )
 
-                y = p1[1] + (
-                    p2[1] - p1[1]
-                ) * ratio
+                y = (
+                    p1[1]
+                    + (
+                        p2[1]
+                        - p1[1]
+                    ) * ratio
+                )
 
-                path.append((x, y))
+                path.append(
+                    (x, y)
+                )
 
                 break
 
@@ -1034,18 +1515,19 @@ class UI:
 
             pygame.draw.lines(
                 surface,
-                (120, 255, 190),
+                MINT,
                 False,
                 path,
                 thickness
             )
 
             # Smooth endpoints
+
             for point in path:
 
                 pygame.draw.circle(
                     surface,
-                    (120, 255, 190),
+                    MINT,
                     (
                         int(point[0]),
                         int(point[1])
